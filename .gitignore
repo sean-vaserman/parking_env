@@ -1,0 +1,24 @@
+# Python Virtual Environments
+bin/
+include/
+lib/
+lib64/
+share/
+pyvenv.cfg
+
+# Python bytecode/compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# IDE/Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
