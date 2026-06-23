@@ -51,7 +51,7 @@ Ensure you have Python 3.10+ installed.
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/parking_env.git
+git clone https://github.com/sean-vaserman/parking_env.git
 cd parking_env
 ```
 
