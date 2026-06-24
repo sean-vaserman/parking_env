@@ -1,10 +1,15 @@
-# Python Virtual Environments
+# Python Virtual Environments (root-level venv and .venv subdirectory)
 bin/
 include/
 lib/
-lib64/
+# lib64 is a symlink to lib created by Python venv; trailing slash won't match a symlink
+lib64
 share/
 pyvenv.cfg
+.venv/
+
+# Simulation output
+replay_*.gif
 
 # Python bytecode/compiled files
 __pycache__/

@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.widgets import Slider, Button
 import numpy as np
+from datetime import datetime
+from PIL import Image
 
 from kinematics import VehicleModel
 from stanley_controller import StanleyController
@@ -40,8 +42,8 @@ GARAGE_OBJECTS = [
     (12.9, 13.5, 0.5, 0.6),     # bin    (right front corner)
 ]
 PARKED_CARS = [
-    (0.5,  5.0, 3.0, 2.0),      # left  parked car (x=0.5–3.5, y=2–4)
-    (20.5, 5.0, 3.0, 2.0),      # right parked car (x=20.5–23.5, y=2–4)
+    (0.5,  5.0, 3.0, 2.0),      # left  parked car (x=0.5–3.5, y=5–7, against curb)
+    (20.5, 5.0, 3.0, 2.0),      # right parked car (x=20.5–23.5, y=5–7, against curb)
 ]
 
 OBSTACLES = ROAD_CURBS + CHANNEL_WALLS + GARAGE_BACK + GARAGE_OBJECTS + PARKED_CARS
@@ -154,17 +156,24 @@ class SimulationApp:
         self.ax_y   = plt.axes([0.15, 0.15, 0.65, 0.03], facecolor=axcolor)
         self.ax_yaw = plt.axes([0.15, 0.10, 0.65, 0.03], facecolor=axcolor)
 
-        # X: 5–19 keeps start well clear of parked cars (which end at x=3.5 / start at x=20.5)
-        # Y: 1.5–5.9 keeps start ≥ 1.05 m from road curb at y=7
-        self.slider_x   = Slider(self.ax_x,   'Start X',  5.0, 19.0, valinit=7.0)
-        self.slider_y   = Slider(self.ax_y,   'Start Y',  1.5,  5.9, valinit=4.0)
+        # X: 7.1–16.9 keeps all 8 cardinal headings ≥1.05 m clear of parked cars
+        # Y: 1.5–3.0  keeps the front-axle circle ≥1.05 m below the road curb at y=7
+        self.slider_x   = Slider(self.ax_x,   'Start X',  7.1, 16.9, valinit=9.0)
+        self.slider_y   = Slider(self.ax_y,   'Start Y',  1.5,  3.0, valinit=2.5)
         self.slider_yaw = Slider(self.ax_yaw, 'Heading', -np.pi, np.pi, valinit=np.radians(45))
 
-        self.ax_btn = plt.axes([0.3, 0.02, 0.2, 0.05])
+        self.recording = False
+
+        self.ax_btn_record = plt.axes([0.05, 0.02, 0.17, 0.05])
+        self.btn_record = Button(self.ax_btn_record, 'Record: OFF',
+                                 color='0.85', hovercolor='0.95')
+        self.btn_record.on_clicked(self.toggle_record)
+
+        self.ax_btn = plt.axes([0.26, 0.02, 0.20, 0.05])
         self.btn_run = Button(self.ax_btn, 'Plan & Drive', hovercolor='0.975')
         self.btn_run.on_clicked(self.run_simulation)
 
-        self.ax_btn_reset = plt.axes([0.55, 0.02, 0.2, 0.05])
+        self.ax_btn_reset = plt.axes([0.50, 0.02, 0.12, 0.05])
         self.btn_reset = Button(self.ax_btn_reset, 'Reset', hovercolor='0.975')
         self.btn_reset.on_clicked(self.reset_simulation)
 
@@ -174,6 +183,40 @@ class SimulationApp:
         self.slider_yaw.on_changed(self.update_preview)
 
         plt.show()
+
+    def toggle_record(self, _event):
+        self.recording = not self.recording
+        if self.recording:
+            self.btn_record.label.set_text('Record: ON')
+            self.btn_record.color      = '#ffcccc'
+            self.btn_record.hovercolor = '#ffaaaa'
+        else:
+            self.btn_record.label.set_text('Record: OFF')
+            self.btn_record.color      = '0.85'
+            self.btn_record.hovercolor = '0.95'
+        self.fig.canvas.draw_idle()
+
+    def _capture_frame(self):
+        """Return the current figure canvas as a PIL Image."""
+        self.fig.canvas.draw()
+        w, h = self.fig.canvas.get_width_height()
+        buf  = np.frombuffer(self.fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(h, w, 4)
+        return Image.fromarray(buf[:, :, :3])   # drop alpha → RGB
+
+    def _save_gif(self, frames):
+        """Save a list of PIL Images as an animated GIF."""
+        if not frames:
+            return
+        path = f"replay_{datetime.now().strftime('%Y%m%d_%H%M%S')}.gif"
+        frames[0].save(
+            path,
+            save_all=True,
+            append_images=frames[1:],
+            optimize=False,
+            duration=100,   # 100 ms per frame ≈ 10 fps
+            loop=0,         # loop forever
+        )
+        print(f"Saved {len(frames)}-frame GIF → {path}")
 
     def update_preview(self, _val):
         if not self.is_running:
@@ -205,9 +248,8 @@ class SimulationApp:
         dt        = 0.1
         target_idx = 0
         last_idx   = len(px) - 1
-        # Stays True once the car enters BRAKE_DIST for a gear-change;
-        # prevents the overshoot case from re-engaging the wrong gear.
         braking_for_gear_change = False
+        frames = []   # populated when self.recording is True
 
         for _ in range(2000):
             if not self.is_running:
@@ -257,6 +299,8 @@ class SimulationApp:
                 self.ax.plot(px, py, 'g--', linewidth=1)
                 draw_vehicle(self.ax, vehicle, steer)
                 plt.pause(0.01)
+                if self.recording:
+                    frames.append(self._capture_frame())
                 print("Successfully Parked and Aligned!")
                 break
 
@@ -268,7 +312,11 @@ class SimulationApp:
             self.ax.plot(px[target_idx], py[target_idx], 'go', markersize=5)
             draw_vehicle(self.ax, vehicle, steer)
             plt.pause(0.01)
+            if self.recording:
+                frames.append(self._capture_frame())
 
+        if self.recording and frames:
+            self._save_gif(frames)
         self.is_running = False
 
 

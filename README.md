@@ -65,7 +65,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
-*(If `requirements.txt` does not exist, install the required packages: `pip install numpy matplotlib pillow`)*
+> **Note:** The TkAgg backend requires Tkinter. On Debian/Ubuntu this is a separate system package: `sudo apt install python3-tk`.
 
 ---
 
@@ -76,10 +76,22 @@ Execute the main script to launch the interactive matplotlib dashboard:
 python main.py
 ```
 
+### Running the Headless Test Suite
+
+`test_cases.py` runs 7 predefined start poses through the full planner + controller loop without opening any window and prints a pass/fail table:
+
+```bash
+python test_cases.py            # concise output
+python test_cases.py --verbose  # show per-case planner progress
+```
+
+Exit code is `0` if all cases pass, `1` otherwise (suitable for CI).
+
 ### How to Use the Dashboard:
-1. **Configure Start Pose**: Use the **Start X**, **Start Y**, and **Heading** sliders at the bottom to reposition the vehicle on the road.
-2. **Plan & Drive**: Click the **Plan & Drive** button. The Hybrid A* path planner will find a collision-free path (displayed as waypoints), and the vehicle will automatically track the path to the garage.
-3. **Reset**: Click the **Reset** button to restore the vehicle to its custom start pose.
+1. **Configure Start Pose**: Use the **Start X**, **Start Y**, and **Heading** sliders to reposition the vehicle on the road.
+2. **Plan & Drive**: Click **Plan & Drive**. The Hybrid A\* planner finds a collision-free path (shown as a dashed green line) and the vehicle tracks it to the garage.
+3. **Record GIF** *(optional)*: Toggle **Record: OFF → ON** before clicking Plan & Drive. After the run completes, a timestamped `replay_YYYYMMDD_HHMMSS.gif` is saved in the working directory at 10 fps.
+4. **Reset**: Click **Reset** to restore the preview with the current slider values.
 
 ---
 
